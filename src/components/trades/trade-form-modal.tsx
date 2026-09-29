@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useJournalData } from '@/contexts/journal-context';
 import { Loader2, Save, X, AlertTriangle } from 'lucide-react';
 
 interface TradeFormModalProps {
@@ -97,6 +98,7 @@ export function TradeFormModal({
 }: TradeFormModalProps) {
   const isEditing = !!trade;
   const writable = useJournalWritable();
+  const { addTradeLocally, updateTradeLocally, refreshData } = useJournalData();
 
   // Basic Form States (Always visible - matching images/them.png)
   const [accountId, setAccountId] = useState<string>('');
@@ -383,6 +385,7 @@ export function TradeFormModal({
     };
 
     try {
+      let savedTrade: Trade | null = null;
       if (isEditing && trade) {
         const res = await updateTrade(trade.id, tradePayload);
         if (!res.success) {
@@ -390,6 +393,7 @@ export function TradeFormModal({
           setLoading(false);
           return;
         }
+        savedTrade = res.data ?? null;
       } else {
         const res = await createTrade(tradePayload);
         if (!res.success) {
@@ -397,9 +401,17 @@ export function TradeFormModal({
           setLoading(false);
           return;
         }
+        savedTrade = res.data ?? null;
       }
 
-      onSuccess?.();
+      // Optimistically update local journal state (0ms UI latency!)
+      if (savedTrade) {
+        if (isEditing) {
+          updateTradeLocally(savedTrade);
+        } else {
+          addTradeLocally(savedTrade);
+        }
+      }
 
       if (keepOpen) {
         // Reset inputs de nhap lenh tiep theo
@@ -420,6 +432,10 @@ export function TradeFormModal({
         onOpenChange(false);
         setLoading(false);
       }
+
+      // Background silent revalidation without freezing UI
+      void refreshData({ silent: true });
+      onSuccess?.();
     } catch {
       setError('Đã xảy ra lỗi khi lưu lệnh.');
       setLoading(false);

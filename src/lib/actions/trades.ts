@@ -130,6 +130,8 @@ export async function getTrades(filters?: TradeFilterParams): Promise<Trade[]> {
   return trades;
 }
 
+let hasReviewColumnCached: boolean | null = null;
+
 export async function createTrade(tradeData: TradeInsert): Promise<{ success: boolean; data?: Trade; error?: string }> {
   const parsed = tradeSchema.safeParse(tradeData);
   if (!parsed.success || !validTradeTime(tradeData.date, tradeData.close_time)) {
@@ -161,11 +163,11 @@ export async function createTrade(tradeData: TradeInsert): Promise<{ success: bo
   // Preserve manual entries on databases that have not applied migration 005 yet.
   // Automatic modes require 005 and deliberately include their calculation columns.
   const calculationModeEnabled = parsed.data.profit_calc_mode !== 'manual' || parsed.data.fee_calc_mode !== 'manual';
-  let hasReviewColumn = false;
-  if (parsed.data.eval_errors_reviewed) {
+  if (parsed.data.eval_errors_reviewed && hasReviewColumnCached === null) {
     const reviewColumn = await supabase.from('trades').select('eval_errors_reviewed').limit(1);
-    hasReviewColumn = !reviewColumn.error;
+    hasReviewColumnCached = !reviewColumn.error;
   }
+  const hasReviewColumn = hasReviewColumnCached === true;
   if (calculationModeEnabled || (autoFee ?? parsed.data.fee) < 0) {
     const schemaCheck = await supabase.from('trades').select('profit_calc_mode').limit(1);
     if (schemaCheck.error) return { success: false, error: 'Cần áp dụng migration 005 trước khi dùng tính toán tự động hoặc lưu phí được ghi có.' };
@@ -193,12 +195,10 @@ export async function createTrade(tradeData: TradeInsert): Promise<{ success: bo
 
   revalidatePath('/history');
   revalidatePath('/');
-  revalidatePath('/report');
-  revalidatePath('/accounts');
   return { success: true, data: { ...data, volume: Number(data.volume), profit: Number(data.profit), fee: Number(data.fee) } };
 }
 
-export async function updateTrade(id: string, tradeData: TradeUpdate): Promise<{ success: boolean; error?: string }> {
+export async function updateTrade(id: string, tradeData: TradeUpdate): Promise<{ success: boolean; data?: Trade; error?: string }> {
   const parsed = tradeSchema.partial().safeParse(tradeData);
   if (!z.uuid().safeParse(id).success || !parsed.success || Object.keys(tradeData).length === 0) {
     return { success: false, error: 'Thông tin lệnh không hợp lệ.' };
@@ -266,7 +266,7 @@ export async function updateTrade(id: string, tradeData: TradeUpdate): Promise<{
     .from('trades')
     .update(updatePayload)
     .eq('id', id)
-    .select('id')
+    .select('*')
     .maybeSingle();
 
   if (error) return { success: false, error: error.message };
@@ -274,9 +274,15 @@ export async function updateTrade(id: string, tradeData: TradeUpdate): Promise<{
 
   revalidatePath('/history');
   revalidatePath('/');
-  revalidatePath('/report');
-  revalidatePath('/accounts');
-  return { success: true };
+  return {
+    success: true,
+    data: {
+      ...data,
+      volume: Number(data.volume),
+      profit: Number(data.profit),
+      fee: Number(data.fee),
+    } as Trade,
+  };
 }
 
 export async function deleteTrade(id: string): Promise<{ success: boolean; error?: string }> {
@@ -289,8 +295,6 @@ export async function deleteTrade(id: string): Promise<{ success: boolean; error
 
   revalidatePath('/history');
   revalidatePath('/');
-  revalidatePath('/report');
-  revalidatePath('/accounts');
   return { success: true };
 }
 
@@ -307,7 +311,5 @@ export async function deleteTradesBatch(ids: string[]): Promise<{ success: boole
 
   revalidatePath('/history');
   revalidatePath('/');
-  revalidatePath('/report');
-  revalidatePath('/accounts');
   return { success: true };
 }
