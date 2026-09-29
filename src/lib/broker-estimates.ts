@@ -18,6 +18,8 @@ export interface BrokerTradeEstimate {
   fee: number | null;
   riskAmount: number | null;
   note: string;
+  warning?: string | null;
+  isPriceInvalid?: boolean;
 }
 
 const FTMO_METALS_COMMISSION_RATE_PER_SIDE = 0.000007; // 0.0007%
@@ -71,6 +73,26 @@ export function estimateBrokerTrade(input: BrokerTradeEstimateInput): BrokerTrad
     };
   }
 
+  const isSlValid = input.stopLoss == null || (
+    input.direction === 'buy' ? input.stopLoss < input.entryPrice : input.stopLoss > input.entryPrice
+  );
+
+  let warning: string | null = null;
+  let isPriceInvalid = false;
+
+  if (positive(input.stopLoss) && !isSlValid) {
+    isPriceInvalid = true;
+    warning = input.direction === 'sell'
+      ? `Lệnh Sell yêu cầu Stop Loss (${input.stopLoss}) phải cao hơn Entry (${input.entryPrice}). Hiện tại SL đang thấp hơn Entry.`
+      : `Lệnh Buy yêu cầu Stop Loss (${input.stopLoss}) phải thấp hơn Entry (${input.entryPrice}). Hiện tại SL đang cao hơn Entry.`;
+  } else if (
+    (positive(input.stopLoss) && (input.entryPrice > input.stopLoss * 2.5 || input.stopLoss > input.entryPrice * 2.5)) ||
+    (positive(input.closePrice) && (input.entryPrice > input.closePrice * 2.5 || input.closePrice > input.entryPrice * 2.5))
+  ) {
+    isPriceInvalid = true;
+    warning = `Cảnh báo: Chênh lệch giá bất thường giữa Entry (${input.entryPrice}) và SL/Close (${input.stopLoss ?? input.closePrice}). Vui lòng kiểm tra xem bạn có gõ thừa/thiếu chữ số không.`;
+  }
+
   const side = input.direction === 'buy' ? 1 : -1;
   const grossProfit = money(
     side * (input.closePrice - input.entryPrice) * XAUUSD_CONTRACT_SIZE * input.volume,
@@ -82,7 +104,7 @@ export function estimateBrokerTrade(input: BrokerTradeEstimateInput): BrokerTrad
     (input.entryPrice + input.closePrice) * XAUUSD_CONTRACT_SIZE * input.volume *
       commissionRate,
   );
-  const stopDistance = positive(input.stopLoss) ? Math.abs(input.entryPrice - input.stopLoss) : 0;
+  const stopDistance = positive(input.stopLoss) && isSlValid ? Math.abs(input.entryPrice - input.stopLoss) : 0;
   const riskAmount = stopDistance > 0
     ? money(stopDistance * XAUUSD_CONTRACT_SIZE * input.volume)
     : null;
@@ -95,5 +117,7 @@ export function estimateBrokerTrade(input: BrokerTradeEstimateInput): BrokerTrad
     fee,
     riskAmount,
     note: `Commission được tính theo biểu phí FTMO Metals CFD (${commissionRate === FTMO_METALS_COMMISSION_RATE_PER_SIDE ? '0,0007%' : '0,0005%'} mỗi chiều); lệnh nhập tay chưa cộng swap qua đêm.`,
+    warning,
+    isPriceInvalid,
   };
 }

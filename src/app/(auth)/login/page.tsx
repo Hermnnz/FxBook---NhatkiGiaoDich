@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { login } from '@/lib/actions/auth';
+import { REGISTRATION_ENABLED } from '@/lib/features';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,10 +14,12 @@ import { CheckCircle2, Loader2, Lock, Mail } from 'lucide-react';
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const registered = searchParams.get('registered') === '1';
-  const confirmationRequired = searchParams.get('confirm') === '1';
+  const registered = REGISTRATION_ENABLED && searchParams.get('registered') === '1';
+  const confirmationRequired = REGISTRATION_ENABLED && searchParams.get('confirm') === '1';
+  const passwordReset = searchParams.get('password-reset') === '1';
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [rememberSession, setRememberSession] = useState(true);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -63,6 +66,13 @@ function LoginForm() {
           </div>
         )}
 
+        {passwordReset && (
+          <div className="p-3 text-xs rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+            <span>Đã đổi mật khẩu. Bạn có thể đăng nhập bằng mật khẩu mới.</span>
+          </div>
+        )}
+
         {error && (
           <div className="p-3 text-xs rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400">
             {error}
@@ -99,6 +109,29 @@ function LoginForm() {
           </div>
         </div>
 
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <label
+            htmlFor="remember"
+            className="flex cursor-pointer items-center gap-2.5 text-xs text-zinc-300"
+          >
+            <input
+              id="remember"
+              name="remember"
+              type="checkbox"
+              checked={rememberSession}
+              onChange={(event) => setRememberSession(event.target.checked)}
+              className="h-4 w-4 cursor-pointer rounded border-[#3a3d41] bg-[#222426] accent-[#00e676]"
+            />
+            <span>Ghi nhớ đăng nhập</span>
+          </label>
+          <Link
+            href="/forgot-password"
+            className="text-xs font-semibold text-[#00e676] hover:underline"
+          >
+            Quên mật khẩu?
+          </Link>
+        </div>
+
         <div className="pt-2">
           <Button
             type="submit"
@@ -110,14 +143,16 @@ function LoginForm() {
           </Button>
         </div>
 
-        <div className="pt-3 text-center border-t border-[#27292d]/60">
-          <p className="text-xs text-zinc-400">
-            Chưa có tài khoản?{' '}
-            <Link href="/register" className="text-[#00e676] hover:underline font-semibold ml-1">
-              Đăng ký ngay
-            </Link>
-          </p>
-        </div>
+        {REGISTRATION_ENABLED && (
+          <div className="pt-3 text-center border-t border-[#27292d]/60">
+            <p className="text-xs text-zinc-400">
+              Chưa có tài khoản?{' '}
+              <Link href="/register" className="text-[#00e676] hover:underline font-semibold ml-1">
+                Đăng ký ngay
+              </Link>
+            </p>
+          </div>
+        )}
       </form>
     </div>
   );

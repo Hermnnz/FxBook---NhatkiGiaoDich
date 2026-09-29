@@ -7,6 +7,11 @@
 
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import {
+  applySessionPersistence,
+  REMEMBER_SESSION_COOKIE,
+  shouldRememberSession,
+} from '@/lib/supabase/session-persistence';
 
 export async function updateSession(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -14,11 +19,22 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
   const isServerAction = Boolean(request.headers.get('next-action'));
-  const isRsc = request.headers.get('rsc') === '1' || Boolean(request.headers.get('next-router-prefetch'));
+  const recoveryCode = request.nextUrl.searchParams.get('code');
 
-  // Fast-path: Server actions, internal RSC navigations, and API routes handle authentication internally.
-  // Bypassing the 500-800ms remote Supabase cloud call makes page navigation and actions instantaneous (0-5ms).
-  if (isServerAction || isRsc || pathname.startsWith('/api/')) {
+  // Supabase may fall back to the configured Site URL for recovery links.
+  // Route a recovery code received at the home page through our PKCE callback.
+  if (pathname === '/' && recoveryCode) {
+    const callbackUrl = request.nextUrl.clone();
+    callbackUrl.pathname = '/auth/callback';
+    callbackUrl.search = '';
+    callbackUrl.searchParams.set('code', recoveryCode);
+    callbackUrl.searchParams.set('next', '/reset-password');
+    return NextResponse.redirect(callbackUrl);
+  }
+
+  // Server actions and API routes handle authentication internally. Page and
+  // RSC requests still pass through the refresh flow so sessions stay alive.
+  if (isServerAction || pathname.startsWith('/api/')) {
     return NextResponse.next({ request });
   }
 
@@ -33,6 +49,9 @@ export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
   });
+  const rememberSession = shouldRememberSession(
+    request.cookies.get(REMEMBER_SESSION_COOKIE)?.value,
+  );
 
   const supabase = createServerClient(
     supabaseUrl,
@@ -49,20 +68,27 @@ export async function updateSession(request: NextRequest) {
           supabaseResponse = NextResponse.next({
             request,
           });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options),
-          );
+          cookiesToSet.forEach(({ name, value, options }) => {
+            supabaseResponse.cookies.set(
+              name,
+              value,
+              applySessionPersistence(options, rememberSession),
+            );
+          });
         },
       },
     },
   );
 
   // Refresh the session before checking access to application routes.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims;
 
-  const publicRoute = pathname === '/login' || pathname === '/register' || pathname === '/setup' || pathname.startsWith('/auth/');
+  const publicRoute = pathname === '/login'
+    || pathname === '/register'
+    || pathname === '/forgot-password'
+    || pathname === '/setup'
+    || pathname.startsWith('/auth/');
 
   if (!user && !publicRoute) {
     const loginUrl = request.nextUrl.clone();

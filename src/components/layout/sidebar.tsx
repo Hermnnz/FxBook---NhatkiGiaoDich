@@ -124,7 +124,7 @@ export function Sidebar({ userEmail }: SidebarProps) {
                   className="max-w-36 truncate text-[10px] text-zinc-500 font-mono"
                   title={userEmail ?? contextEmail ?? undefined}
                 >
-                  {userEmail ?? contextEmail ?? 'ndanh.fin@gmail.com'}
+                  {userEmail ?? contextEmail ?? 'Chưa xác định email'}
                 </div>
               </div>
             </div>

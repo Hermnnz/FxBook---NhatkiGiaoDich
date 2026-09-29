@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Loader2, Save, X } from 'lucide-react';
+import { Loader2, Save, X, AlertTriangle } from 'lucide-react';
 
 interface TradeFormModalProps {
   open: boolean;
@@ -193,16 +193,40 @@ export function TradeFormModal({
   }, [trade, activeAccountId, accounts, open]);
 
   // Realtime calculated Net Profit
-  const optionalNumber = (value: string) => value.trim() === '' ? null : Number(value);
+  const optionalNumber = (value: string) => {
+    if (!value) return null;
+    const clean = String(value).replace(',', '.').trim();
+    return clean === '' || Number.isNaN(Number(clean)) ? null : Number(clean);
+  };
   const selectedAccount = accounts.find((account) => account.id === accountId);
+  const parsedEntry = optionalNumber(entryPrice);
+  const parsedSl = optionalNumber(slPrice);
+  const parsedTp = optionalNumber(tpPrice);
+  const parsedClose = optionalNumber(exitPrice);
+
+  const slDirectionError = parsedEntry !== null && parsedSl !== null && (
+    direction === 'buy' ? parsedSl >= parsedEntry : parsedSl <= parsedEntry
+  );
+
+  const tpDirectionError = parsedEntry !== null && parsedTp !== null && (
+    direction === 'buy' ? parsedTp <= parsedEntry : parsedTp >= parsedEntry
+  );
+
+  const priceAnomalyError = parsedEntry !== null && (
+    (parsedSl !== null && (parsedEntry > parsedSl * 2.5 || parsedSl > parsedEntry * 2.5)) ||
+    (parsedClose !== null && (parsedEntry > parsedClose * 2.5 || parsedClose > parsedEntry * 2.5))
+  );
+
+  const hasPriceLogicError = slDirectionError || priceAnomalyError;
+
   const automaticEstimate = estimateBrokerTrade({
     accountName: selectedAccount?.name ?? '',
     accountCurrency: selectedAccount?.currency ?? '',
     symbol,
     direction,
-    entryPrice: optionalNumber(entryPrice),
-    closePrice: optionalNumber(exitPrice),
-    stopLoss: optionalNumber(slPrice),
+    entryPrice: parsedEntry,
+    closePrice: parsedClose,
+    stopLoss: parsedSl,
     volume: optionalNumber(volume),
     tradeDate: date,
   });
@@ -211,15 +235,15 @@ export function TradeFormModal({
   const preserveStoredBrokerValues = !!trade && (!!trade.mt5_key || !automaticEstimate.supported);
   const effectiveProfit = preserveStoredBrokerValues ? trade.profit : automaticEstimate.grossProfit;
   const effectiveFee = preserveStoredBrokerValues ? trade.fee : automaticEstimate.fee;
-  const netAvailable = effectiveProfit !== null && effectiveFee !== null &&
+  const netAvailable = !hasPriceLogicError && effectiveProfit !== null && effectiveFee !== null &&
     Number.isFinite(effectiveProfit) && Number.isFinite(effectiveFee);
   const currentNet = netProfit({ profit: effectiveProfit ?? 0, fee: effectiveFee ?? 0 });
   const accountCurrency = accounts.find((account) => account.id === accountId)?.currency ?? 'tiền tệ tài khoản';
   const autoCalculatedTheoretical = calcTheoreticalProfit({
     symbol,
     direction,
-    entryPrice: optionalNumber(entryPrice),
-    tpPrice: optionalNumber(tpPrice),
+    entryPrice: parsedEntry,
+    tpPrice: parsedTp,
     volume: optionalNumber(volume),
     fee: effectiveFee ?? 0,
   });
@@ -524,8 +548,15 @@ export function TradeFormModal({
                 value={entryPrice}
                 onChange={(e) => setEntryPrice(e.target.value)}
                 placeholder="0.00"
-                className="h-10 bg-[#222426] border-[#2e3135] text-white text-xs font-mono focus-visible:ring-[#00e676]/50"
+                className={`h-10 bg-[#222426] border text-white text-xs font-mono focus-visible:ring-[#00e676]/50 ${
+                  priceAnomalyError ? 'border-rose-500/70 focus-visible:ring-rose-500/50' : 'border-[#2e3135]'
+                }`}
               />
+              {priceAnomalyError && (
+                <p className="text-[11px] text-rose-400 font-medium">
+                  ⚠️ Giá vào {entryPrice} lệch bất thường so với SL/Close. Kiểm tra lại số chữ số.
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5">
@@ -536,21 +567,47 @@ export function TradeFormModal({
                 value={slPrice}
                 onChange={(e) => setSlPrice(e.target.value)}
                 placeholder="0.00"
-                className="h-10 bg-[#222426] border-[#2e3135] text-white text-xs font-mono focus-visible:ring-[#00e676]/50"
+                className={`h-10 bg-[#222426] border text-white text-xs font-mono focus-visible:ring-[#00e676]/50 ${
+                  slDirectionError ? 'border-rose-500/70 focus-visible:ring-rose-500/50' : 'border-[#2e3135]'
+                }`}
               />
+              {slDirectionError && (
+                <p className="text-[11px] text-rose-400 font-medium">
+                  ⚠️ Lệnh {direction === 'sell' ? 'Sell cần Stop Loss cao hơn Entry' : 'Buy cần Stop Loss thấp hơn Entry'} ({entryPrice})
+                </p>
+              )}
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label className="text-xs text-zinc-300">Take Profit (tùy chọn)</Label>
-              <Input type="number" step="any" value={tpPrice} onChange={(e) => setTpPrice(e.target.value)}
-                placeholder="0.00" className="h-10 bg-[#222426] border-[#2e3135] text-white text-xs font-mono focus-visible:ring-[#00e676]/50" />
+              <Input
+                type="number"
+                step="any"
+                value={tpPrice}
+                onChange={(e) => setTpPrice(e.target.value)}
+                placeholder="0.00"
+                className={`h-10 bg-[#222426] border text-white text-xs font-mono focus-visible:ring-[#00e676]/50 ${
+                  tpDirectionError ? 'border-rose-500/70 focus-visible:ring-rose-500/50' : 'border-[#2e3135]'
+                }`}
+              />
+              {tpDirectionError && (
+                <p className="text-[11px] text-rose-400 font-medium">
+                  ⚠️ Lệnh {direction === 'sell' ? 'Sell cần Take Profit thấp hơn Entry' : 'Buy cần Take Profit cao hơn Entry'} ({entryPrice})
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-zinc-300">Close Price (Giá đóng) *</Label>
-              <Input type="number" step="any" value={exitPrice} onChange={(e) => setExitPrice(e.target.value)}
-                placeholder="0.00" className="h-10 bg-[#222426] border-[#2e3135] text-white text-xs font-mono focus-visible:ring-[#00e676]/50" />
+              <Input
+                type="number"
+                step="any"
+                value={exitPrice}
+                onChange={(e) => setExitPrice(e.target.value)}
+                placeholder="0.00"
+                className="h-10 bg-[#222426] border-[#2e3135] text-white text-xs font-mono focus-visible:ring-[#00e676]/50"
+              />
             </div>
           </div>
 
@@ -568,22 +625,50 @@ export function TradeFormModal({
                 className="h-10 bg-[#222426] border-[#2e3135] text-white text-xs font-mono focus-visible:ring-[#00e676]/50"
               />
             </div>
-
           </div>
 
           {/* Giá trị tài chính do hệ thống tính, người dùng không phải nhập phí. */}
           <div className="rounded-xl border border-[#2e3135] bg-[#202224] p-3 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="text-xs font-semibold text-zinc-200">Hệ thống tự tính</div>
-              <div className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-400">
-                {preserveStoredBrokerValues ? 'Số liệu thực tế từ broker' : automaticEstimate.profileLabel ?? 'Chưa nhận diện'}
+              <div className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                hasPriceLogicError ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30' : 'bg-emerald-500/10 text-emerald-400'
+              }`}>
+                {hasPriceLogicError ? 'Phát hiện giá không hợp lệ' : preserveStoredBrokerValues ? 'Số liệu thực tế từ broker' : automaticEstimate.profileLabel ?? 'Chưa nhận diện'}
               </div>
             </div>
+
+            {/* Warning banner if prices are contradictory or abnormal */}
+            {(hasPriceLogicError || automaticEstimate.warning) && (
+              <div className="rounded-lg bg-rose-500/15 border border-rose-500/30 p-2.5 text-xs text-rose-200 space-y-1">
+                <div className="font-bold flex items-center gap-1.5 text-rose-400">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>Phát hiện bất thường về giá</span>
+                </div>
+                {slDirectionError && (
+                  <p>
+                    Lệnh <strong>{direction === 'sell' ? 'Sell (Short)' : 'Buy (Long)'}</strong> yêu cầu Stop Loss ({slPrice}) phải {direction === 'sell' ? 'cao hơn' : 'thấp hơn'} Entry ({entryPrice}).
+                  </p>
+                )}
+                {priceAnomalyError && (
+                  <p>
+                    Giá vào (<strong>{entryPrice}</strong>) chênh lệch quá lớn so với SL (<strong>{slPrice}</strong>) / Close (<strong>{exitPrice}</strong>). Vui lòng kiểm tra lại bạn có gõ thừa số không (ví dụ gõ nhầm 42293 thay vì 4293).
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <div className="rounded-lg bg-[#181a1b] px-3 py-2.5">
                 <div className="text-[10px] text-zinc-500">Lãi/lỗ gộp</div>
                 <div className="font-mono text-sm font-bold text-zinc-100">
-                  {effectiveProfit == null ? '—' : `${effectiveProfit >= 0 ? '+' : ''}${effectiveProfit.toFixed(2)} ${accountCurrency}`}
+                  {hasPriceLogicError ? (
+                    <span className="text-rose-400 text-xs font-sans">Giá chưa hợp lệ</span>
+                  ) : effectiveProfit == null ? (
+                    '—'
+                  ) : (
+                    `${effectiveProfit >= 0 ? '+' : ''}${effectiveProfit.toFixed(2)} ${accountCurrency}`
+                  )}
                 </div>
               </div>
               <div className="rounded-lg bg-[#181a1b] px-3 py-2.5">
@@ -595,14 +680,20 @@ export function TradeFormModal({
               <div className="rounded-lg bg-[#181a1b] px-3 py-2.5">
                 <div className="text-[10px] text-zinc-500">Rủi ro tại Stop Loss</div>
                 <div className="font-mono text-sm font-bold text-zinc-100">
-                  {(preserveStoredBrokerValues ? trade.risk_amount : automaticEstimate.riskAmount) == null
-                    ? '—'
-                    : `${(preserveStoredBrokerValues ? trade.risk_amount! : automaticEstimate.riskAmount!).toFixed(2)} ${accountCurrency}`}
+                  {hasPriceLogicError ? (
+                    <span className="text-rose-400 text-xs font-sans">Giá chưa hợp lệ</span>
+                  ) : (preserveStoredBrokerValues ? trade.risk_amount : automaticEstimate.riskAmount) == null ? (
+                    '—'
+                  ) : (
+                    `${(preserveStoredBrokerValues ? trade.risk_amount! : automaticEstimate.riskAmount!).toFixed(2)} ${accountCurrency}`
+                  )}
                 </div>
               </div>
             </div>
-            <p className={`text-[11px] ${automaticEstimate.supported || preserveStoredBrokerValues ? 'text-zinc-400' : 'text-amber-400'}`}>
-              {preserveStoredBrokerValues
+            <p className={`text-[11px] ${hasPriceLogicError ? 'text-rose-400 font-medium' : automaticEstimate.supported || preserveStoredBrokerValues ? 'text-zinc-400' : 'text-amber-400'}`}>
+              {hasPriceLogicError
+                ? 'Hãy sửa lại giá Entry hoặc Stop Loss cho đúng quy tắc khớp lệnh trước khi lưu.'
+                : preserveStoredBrokerValues
                 ? 'Lệnh nhập từ MT5 giữ nguyên lãi/lỗ, commission và swap do broker cung cấp.'
                 : automaticEstimate.note}
             </p>
@@ -613,12 +704,18 @@ export function TradeFormModal({
             <div className="text-xs text-zinc-400">Lãi/Lỗ ròng (Net)</div>
             <div
               className={`text-2xl font-black tracking-tight ${
-                currentNet >= 0 ? 'text-[#00e676]' : 'text-rose-400'
+                hasPriceLogicError ? 'text-amber-400 text-sm py-1' : currentNet >= 0 ? 'text-[#00e676]' : 'text-rose-400'
               }`}
             >
-              {!netAvailable ? 'Chưa đủ thông số' : currentNet >= 0
-                ? `+${currentNet.toFixed(2)} ${accountCurrency}`
-                : `-${Math.abs(currentNet).toFixed(2)} ${accountCurrency}`}
+              {hasPriceLogicError ? (
+                'Vui lòng kiểm tra lại giá Entry / SL'
+              ) : !netAvailable ? (
+                'Chưa đủ thông số'
+              ) : currentNet >= 0 ? (
+                `+${currentNet.toFixed(2)} ${accountCurrency}`
+              ) : (
+                `-${Math.abs(currentNet).toFixed(2)} ${accountCurrency}`
+              )}
             </div>
           </div>
 

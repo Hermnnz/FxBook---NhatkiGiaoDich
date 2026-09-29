@@ -161,16 +161,17 @@ export async function createTrade(tradeData: TradeInsert): Promise<{ success: bo
   // Preserve manual entries on databases that have not applied migration 005 yet.
   // Automatic modes require 005 and deliberately include their calculation columns.
   const calculationModeEnabled = parsed.data.profit_calc_mode !== 'manual' || parsed.data.fee_calc_mode !== 'manual';
+  let hasReviewColumn = false;
   if (parsed.data.eval_errors_reviewed) {
     const reviewColumn = await supabase.from('trades').select('eval_errors_reviewed').limit(1);
-    if (reviewColumn.error) return { success: false, error: 'Cần áp dụng migration 006 trước khi lưu đánh giá lỗi.' };
+    hasReviewColumn = !reviewColumn.error;
   }
   if (calculationModeEnabled || (autoFee ?? parsed.data.fee) < 0) {
     const schemaCheck = await supabase.from('trades').select('profit_calc_mode').limit(1);
     if (schemaCheck.error) return { success: false, error: 'Cần áp dụng migration 005 trước khi dùng tính toán tự động hoặc lưu phí được ghi có.' };
   }
   const baseFields = Object.fromEntries(Object.entries(parsed.data).filter(([key]) =>
-    !calculationColumns.has(key) && (key !== 'eval_errors_reviewed' || parsed.data.eval_errors_reviewed)));
+    !calculationColumns.has(key) && (key !== 'eval_errors_reviewed' || (parsed.data.eval_errors_reviewed && hasReviewColumn))));
   const calculationFields = Object.fromEntries(Object.entries(parsed.data).filter(([key]) => calculationColumns.has(key)));
   const { data, error } = await supabase
     .from('trades')
@@ -211,9 +212,6 @@ export async function updateTrade(id: string, tradeData: TradeUpdate): Promise<{
   if (!current) return { success: false, error: 'Lệnh không tồn tại hoặc bạn không có quyền sửa.' };
   const legacySchema = !Object.prototype.hasOwnProperty.call(current, 'profit_calc_mode');
   const legacyReview = !Object.prototype.hasOwnProperty.call(current, 'eval_errors_reviewed');
-  if (legacyReview && provided.eval_errors_reviewed === true) {
-    return { success: false, error: 'Cần áp dụng migration 006 trước khi lưu đánh giá lỗi.' };
-  }
   const combined = { profit_calc_mode: 'manual', fee_calc_mode: 'manual', ...current, ...provided };
   if (combined.account_id !== current.account_id) {
     const { data: accounts, error: accountsError } = await supabase.from('accounts')

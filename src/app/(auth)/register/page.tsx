@@ -3,14 +3,17 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { redirect, useRouter } from 'next/navigation';
 import { signup } from '@/lib/actions/auth';
+import { REGISTRATION_ENABLED } from '@/lib/features';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, Lock, Mail } from 'lucide-react';
 
 export default function RegisterPage() {
+  if (!REGISTRATION_ENABLED) redirect('/login');
+
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);

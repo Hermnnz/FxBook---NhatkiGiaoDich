@@ -156,7 +156,7 @@ export default function AccountPage() {
                 <h2 className="text-base font-bold text-white tracking-tight">
                   Nguyễn Đức Anh
                 </h2>
-                <p className="text-xs text-zinc-400">{email || 'ndanh.fin@gmail.com'} · FxBook Journal</p>
+                <p className="text-xs text-zinc-400">{email || 'Chưa xác định email'} · FxBook Journal</p>
               </div>
             </div>
 
