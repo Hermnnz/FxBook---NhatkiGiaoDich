@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import { useJournalData } from '@/contexts/journal-context';
 import { Button } from '@/components/ui/button';
-import { SubscriptionBanner } from '@/components/phase5/subscription-banner';
 
 interface SidebarProps {
   userEmail?: string | null;
@@ -200,7 +199,6 @@ export function Sidebar({ userEmail }: SidebarProps) {
 
         {/* Footer Area: Sync status, Account Badge, Support, Brand note */}
         <div className="p-3 border-t border-[#27292d] space-y-3 bg-[#151718]">
-          <SubscriptionBanner />
           {/* Sync indicator */}
           <div className="flex items-center gap-1.5 px-1 text-xs font-medium text-[#00e676]">
             <span>Đã lưu ✓</span>
