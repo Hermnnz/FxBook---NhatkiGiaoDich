@@ -20,10 +20,10 @@ export const metadata: Metadata = {
     "Nhật ký giao dịch tài chính chuyên nghiệp. Theo dõi, phân tích và cải thiện hiệu suất giao dịch.",
   icons: {
     icon: [
-      { url: "/favicon.ico", sizes: "any" },
-      { url: "/avatar.png", type: "image/png" },
+      { url: "/icon.png?v=2", type: "image/png" },
+      { url: "/favicon.ico?v=2", sizes: "any" },
     ],
-    apple: "/avatar.png",
+    apple: "/apple-icon.png?v=2",
   },
 };
 
