@@ -18,6 +18,13 @@ export const metadata: Metadata = {
   title: "FxBook — Nhật Ký Giao Dịch",
   description:
     "Nhật ký giao dịch tài chính chuyên nghiệp. Theo dõi, phân tích và cải thiện hiệu suất giao dịch.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/avatar.png", type: "image/png" },
+    ],
+    apple: "/avatar.png",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
