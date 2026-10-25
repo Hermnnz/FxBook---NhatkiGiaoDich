@@ -58,6 +58,9 @@ export async function createAccount(accountData: AccountInsert): Promise<{ succe
     .single();
 
   if (error) {
+    if (error.code === '23505' || error.message.includes('uq_accounts_user_id_name') || error.message.toLowerCase().includes('duplicate')) {
+      return { success: false, error: `Tài khoản "${parsed.data.name}" đã tồn tại. Vui lòng đặt tên khác.` };
+    }
     return { success: false, error: error.message };
   }
 
@@ -86,7 +89,12 @@ export async function updateAccount(id: string, accountData: AccountUpdate): Pro
     .select('id')
     .maybeSingle();
 
-  if (error) return { success: false, error: error.message };
+  if (error) {
+    if (error.code === '23505' || error.message.includes('uq_accounts_user_id_name') || error.message.toLowerCase().includes('duplicate')) {
+      return { success: false, error: 'Tên tài khoản này đã tồn tại. Vui lòng chọn tên khác.' };
+    }
+    return { success: false, error: error.message };
+  }
   if (!data) return { success: false, error: 'Tài khoản không tồn tại hoặc bạn không có quyền sửa.' };
 
   revalidatePath('/accounts');

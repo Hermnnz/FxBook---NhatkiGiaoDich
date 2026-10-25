@@ -24,6 +24,12 @@ interface AccountModalProps {
   onSuccess?: () => void;
 }
 
+function parseNumeric(val: unknown): number {
+  if (typeof val === 'number') return val;
+  const str = String(val ?? '').trim().replace(/\s/g, '').replace(',', '.');
+  return Number(str);
+}
+
 export function AccountModal({ open, onOpenChange, account, onSuccess }: AccountModalProps) {
   const writable = useJournalWritable();
   const [loading, setLoading] = useState(false);
@@ -38,8 +44,8 @@ export function AccountModal({ open, onOpenChange, account, onSuccess }: Account
 
     const formData = new FormData(e.currentTarget);
     const name = (formData.get('name') as string)?.trim();
-    const initialBalance = Number(formData.get('initial_balance'));
-    const riskPct = Number(formData.get('risk_pct'));
+    const initialBalance = parseNumeric(formData.get('initial_balance'));
+    const riskPct = parseNumeric(formData.get('risk_pct'));
     const currency = (formData.get('currency') as string)?.trim() || 'USD';
 
     if (!writable) {
@@ -104,7 +110,7 @@ export function AccountModal({ open, onOpenChange, account, onSuccess }: Account
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
           {error && (
             <div className="p-3 text-sm rounded-lg bg-destructive/10 border border-destructive/20 text-destructive">
               {error}
@@ -129,8 +135,8 @@ export function AccountModal({ open, onOpenChange, account, onSuccess }: Account
               <Input
                 id="initial_balance"
                 name="initial_balance"
-                type="number"
-                step="any"
+                type="text"
+                inputMode="decimal"
                 placeholder="10000"
                 defaultValue={account?.initial_balance ?? 10000}
                 required
@@ -142,10 +148,8 @@ export function AccountModal({ open, onOpenChange, account, onSuccess }: Account
               <Input
                 id="risk_pct"
                 name="risk_pct"
-                type="number"
-                step="0.1"
-                min="0.1"
-                max="100"
+                type="text"
+                inputMode="decimal"
                 placeholder="1.0"
                 defaultValue={account?.risk_pct ?? 1.0}
                 required

@@ -76,6 +76,8 @@ export default function SettingsPage() {
   const [newAccBalance, setNewAccBalance] = useState('10000');
   const [newAccRisk, setNewAccRisk] = useState('1.0');
   const [newAccCurrency, setNewAccCurrency] = useState('USD');
+  const [accError, setAccError] = useState<string | null>(null);
+  const [accSuccess, setAccSuccess] = useState<string | null>(null);
 
   // Modals
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
@@ -142,19 +144,47 @@ export default function SettingsPage() {
     }
   }
 
+  function parseNumericInput(val: string | number): number {
+    if (typeof val === 'number') return val;
+    const str = String(val ?? '').trim().replace(/\s/g, '').replace(',', '.');
+    return Number(str);
+  }
+
   // Create new trading account
   async function handleCreateAccount(e: React.FormEvent) {
     e.preventDefault();
-    if (!newAccName.trim() || !canWrite) return;
+    setAccError(null);
+    setAccSuccess(null);
+
+    const name = newAccName.trim();
+    if (!name) {
+      setAccError('Vui lòng nhập tên tài khoản.');
+      return;
+    }
+    if (!canWrite) {
+      setAccError('Chế độ chỉ đọc: Không thể thêm tài khoản.');
+      return;
+    }
+
+    const initialBalance = parseNumericInput(newAccBalance);
+    const riskPct = parseNumericInput(newAccRisk);
+
+    if (!Number.isFinite(initialBalance) || initialBalance < 0) {
+      setAccError('Số dư ban đầu phải là số không âm (>= 0).');
+      return;
+    }
+
+    if (!Number.isFinite(riskPct) || riskPct <= 0 || riskPct > 100) {
+      setAccError('Tỷ lệ rủi ro/lệnh phải từ 0.01% đến 100%.');
+      return;
+    }
+
     setBusy(true);
     setMessage(null);
 
     try {
-      const initialBalance = Number(newAccBalance);
-      const riskPct = Number(newAccRisk);
-      if (!Number.isFinite(initialBalance) || initialBalance < 0 || !Number.isFinite(riskPct) || riskPct <= 0 || riskPct > 100) throw new Error('Số dư hoặc tỷ lệ rủi ro không hợp lệ.');
       const result = await createAccount({
-        name: newAccName.trim(),
+        name,
         initial_balance: initialBalance,
         risk_pct: riskPct,
         currency: newAccCurrency,
@@ -163,12 +193,15 @@ export default function SettingsPage() {
       if (!result.success) throw new Error(result.error ?? 'Không thể tạo tài khoản.');
 
       setNewAccName('');
+      setAccSuccess(`Đã thêm tài khoản "${name}" thành công!`);
       setMessage({ text: 'Thêm tài khoản thành công!', type: 'success' });
       await loadAll();
       await refreshData();
     } catch (err) {
+      const errMsg = err instanceof Error ? err.message : 'Không thể tạo tài khoản.';
+      setAccError(errMsg);
       setMessage({
-        text: err instanceof Error ? err.message : 'Không thể tạo tài khoản.',
+        text: errMsg,
         type: 'error',
       });
     } finally {
@@ -476,15 +509,31 @@ export default function SettingsPage() {
             {/* Form + Thêm tài khoản mới */}
             <form
               onSubmit={handleCreateAccount}
+              noValidate
               className="pt-3 border-t border-[#27292d] space-y-3"
             >
               <div className="text-xs font-bold text-zinc-300">+ Thêm tài khoản mới</div>
+
+              {accError && (
+                <div className="p-2.5 rounded-lg text-xs font-medium bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                  {accError}
+                </div>
+              )}
+              {accSuccess && (
+                <div className="p-2.5 rounded-lg text-xs font-medium bg-[#00e676]/15 text-[#00e676] border border-[#00e676]/30">
+                  {accSuccess}
+                </div>
+              )}
+
               <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
                 <div className="sm:col-span-2">
                   <label className="block text-[10px] text-zinc-400 mb-1">Tên tài khoản</label>
                   <Input
                     value={newAccName}
-                    onChange={(e) => setNewAccName(e.target.value)}
+                    onChange={(e) => {
+                      setNewAccName(e.target.value);
+                      if (accError) setAccError(null);
+                    }}
                     placeholder="ACC1, FTMO..."
                     className="bg-[#222426] border-[#2e3135] text-xs h-8"
                     required
@@ -493,9 +542,14 @@ export default function SettingsPage() {
                 <div>
                   <label className="block text-[10px] text-zinc-400 mb-1">Số dư đầu</label>
                   <Input
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     value={newAccBalance}
-                    onChange={(e) => setNewAccBalance(e.target.value)}
+                    onChange={(e) => {
+                      setNewAccBalance(e.target.value);
+                      if (accError) setAccError(null);
+                    }}
+                    placeholder="10000"
                     className="bg-[#222426] border-[#2e3135] text-xs h-8"
                     required
                   />
@@ -503,10 +557,14 @@ export default function SettingsPage() {
                 <div>
                   <label className="block text-[10px] text-zinc-400 mb-1">Rủi ro/lệnh (%)</label>
                   <Input
-                    type="number"
-                    step="0.1"
+                    type="text"
+                    inputMode="decimal"
                     value={newAccRisk}
-                    onChange={(e) => setNewAccRisk(e.target.value)}
+                    onChange={(e) => {
+                      setNewAccRisk(e.target.value);
+                      if (accError) setAccError(null);
+                    }}
+                    placeholder="0.15 hoặc 1"
                     className="bg-[#222426] border-[#2e3135] text-xs h-8"
                     required
                   />
@@ -528,9 +586,9 @@ export default function SettingsPage() {
               <Button
                 type="submit"
                 disabled={busy || !canWrite}
-                className="bg-[#00e676] hover:bg-[#00c853] text-zinc-950 font-bold text-xs h-8 px-4"
+                className="bg-[#00e676] hover:bg-[#00c853] text-zinc-950 font-bold text-xs h-8 px-4 cursor-pointer"
               >
-                Thêm
+                {busy ? 'Đang thêm...' : 'Thêm'}
               </Button>
             </form>
           </section>
