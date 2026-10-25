@@ -9,13 +9,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useJournalData } from '@/contexts/journal-context';
 import { createClient } from '@/lib/supabase/client';
-import { getSubscriptionStatus, type Subscription, type SubscriptionStatus } from '@/lib/phase5/subscription';
 
 export default function AccountPage() {
   const router = useRouter();
   const { accounts } = useJournalData();
   const [email, setEmail] = useState('');
-  const [status, setStatus] = useState<SubscriptionStatus | null>(null);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -33,15 +31,6 @@ export default function AccountPage() {
 
         if (auth.user) {
           setEmail(auth.user.email ?? '');
-          const { data: subscription } = await client
-            .from('subscriptions')
-            .select('*')
-            .eq('user_id', auth.user.id)
-            .maybeSingle();
-
-          if (alive && subscription) {
-            setStatus(getSubscriptionStatus(subscription as Subscription));
-          }
         }
       } catch {
         // ignore load errors
@@ -172,40 +161,7 @@ export default function AccountPage() {
             </div>
           </section>
 
-          {/* Section 2: Thời hạn sử dụng */}
-          <section className="p-6 rounded-xl border border-[#27292d] bg-[#1a1c1e] space-y-4 shadow-sm">
-            <div className="space-y-1">
-              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-                <span>⏳</span>
-                <span>Thời hạn sử dụng</span>
-              </h2>
-            </div>
-
-            <div className="space-y-1">
-              <div className="text-2xl font-bold text-[#00e676]">
-                {status ? (
-                  status.state === 'trial' ? `Còn ${status.daysLeft} ngày` : status.state === 'active' ? 'Gói đã kích hoạt' : 'Đã hết hạn · chỉ đọc'
-                ) : (
-                  'Chưa có thông tin thời hạn'
-                )}
-              </div>
-              <div className="text-xs text-zinc-400">
-                {status?.endsAt
-                  ? `Hết hạn vào ${new Date(status.endsAt).toLocaleDateString('vi-VN')}`
-                  : 'Kiểm tra migration 002/003 trên Supabase.'}
-              </div>
-            </div>
-
-            <Button
-              type="button"
-              onClick={() => window.open('https://t.me/phamduydinh', '_blank')}
-              className="bg-[#00e676] hover:bg-[#00c853] text-zinc-950 font-bold text-xs px-5 py-2 cursor-pointer shadow-[0_0_12px_rgba(0,230,118,0.25)]"
-            >
-              Gia hạn ngay
-            </Button>
-          </section>
-
-          {/* Section 3: Đổi mật khẩu */}
+          {/* Section 2: Đổi mật khẩu */}
           <section className="p-6 rounded-xl border border-[#27292d] bg-[#1a1c1e] space-y-4 shadow-sm">
             <div className="space-y-1">
               <h2 className="text-sm font-semibold text-white flex items-center gap-2">

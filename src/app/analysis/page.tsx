@@ -119,10 +119,6 @@ export default function AnalysisPage() {
   // Save new analysis
   async function handleSaveAnalysis(e: React.FormEvent) {
     e.preventDefault();
-    if (!canWrite) {
-      setMessage({ text: 'Tài khoản đang ở chế độ chỉ đọc.', type: 'error' });
-      return;
-    }
     if (!symbol.trim()) {
       setMessage({ text: 'Vui lòng nhập mã Symbol.', type: 'error' });
       return;

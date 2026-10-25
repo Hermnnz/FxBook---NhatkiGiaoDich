@@ -40,12 +40,6 @@ export function TransactionModal({ open, onOpenChange, account, onSuccess }: Tra
     const note = (formData.get('note') as string)?.trim();
     const date = (formData.get('date') as string) || new Date().toLocaleDateString('en-CA');
 
-    if (!writable) {
-      setError('Tài khoản đã hết hạn dùng thử. Bạn chỉ có thể xem dữ liệu.');
-      setLoading(false);
-      return;
-    }
-
     if (!Number.isFinite(amount) || amount <= 0) {
       setError('Số tiền phải lớn hơn 0.');
       setLoading(false);
@@ -99,7 +93,6 @@ export function TransactionModal({ open, onOpenChange, account, onSuccess }: Tra
               {error}
             </div>
           )}
-          {!writable && <p className="text-sm text-amber-400">Chế độ chỉ đọc: thời gian dùng thử đã hết hoặc chưa tải được quyền ghi.</p>}
 
           <div className="space-y-2">
             <Label>Loại giao dịch</Label>

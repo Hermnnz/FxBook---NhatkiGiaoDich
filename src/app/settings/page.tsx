@@ -161,10 +161,6 @@ export default function SettingsPage() {
       setAccError('Vui lòng nhập tên tài khoản.');
       return;
     }
-    if (!canWrite) {
-      setAccError('Chế độ chỉ đọc: Không thể thêm tài khoản.');
-      return;
-    }
 
     const initialBalance = parseNumericInput(newAccBalance);
     const riskPct = parseNumericInput(newAccRisk);

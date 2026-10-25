@@ -278,12 +278,6 @@ export function TradeFormModal({
     setError(null);
     setLoading(true);
 
-    if (!writable) {
-      setError('Tài khoản đã hết hạn dùng thử. Bạn chỉ có thể xem dữ liệu.');
-      setLoading(false);
-      return;
-    }
-
     if (!accountId) {
       setError('Vui lòng tạo và chọn tài khoản giao dịch trước khi lưu lệnh.');
       setLoading(false);
@@ -471,7 +465,6 @@ export function TradeFormModal({
               {error}
             </div>
           )}
-          {!writable && <p className="text-xs text-amber-400">Chế độ chỉ đọc: thời gian dùng thử đã hết hoặc chưa tải được quyền ghi.</p>}
 
           {/* ROW 1: Tài khoản & Ngày */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

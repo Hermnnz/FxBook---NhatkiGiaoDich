@@ -48,12 +48,6 @@ export function AccountModal({ open, onOpenChange, account, onSuccess }: Account
     const riskPct = parseNumeric(formData.get('risk_pct'));
     const currency = (formData.get('currency') as string)?.trim() || 'USD';
 
-    if (!writable) {
-      setError('Tài khoản đã hết hạn dùng thử. Bạn chỉ có thể xem dữ liệu.');
-      setLoading(false);
-      return;
-    }
-
     if (!name || !Number.isFinite(initialBalance) || initialBalance < 0 ||
         !Number.isFinite(riskPct) || riskPct <= 0 || riskPct > 100 || !/^[A-Za-z]{3}$/.test(currency)) {
       setError('Kiểm tra lại tên, số vốn, rủi ro và mã tiền tệ (3 chữ cái).');
@@ -116,7 +110,6 @@ export function AccountModal({ open, onOpenChange, account, onSuccess }: Account
               {error}
             </div>
           )}
-          {!writable && <p className="text-sm text-amber-400">Chế độ chỉ đọc: thời gian dùng thử đã hết hoặc chưa tải được quyền ghi.</p>}
 
           <div className="space-y-2">
             <Label htmlFor="name">Tên tài khoản</Label>
