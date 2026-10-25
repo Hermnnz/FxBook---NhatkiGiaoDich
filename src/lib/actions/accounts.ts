@@ -61,6 +61,9 @@ export async function createAccount(accountData: AccountInsert): Promise<{ succe
     if (error.code === '23505' || error.message.includes('uq_accounts_user_id_name') || error.message.toLowerCase().includes('duplicate')) {
       return { success: false, error: `Tài khoản "${parsed.data.name}" đã tồn tại. Vui lòng đặt tên khác.` };
     }
+    if (error.message.toLowerCase().includes('row-level security') || error.message.includes('can_write_journal') || error.code === '42501') {
+      return { success: false, error: 'Database đang chặn ghi do hết hạn trial (RLS). Vui lòng chạy Migration 007 trong Supabase để mở khóa vĩnh viễn.' };
+    }
     return { success: false, error: error.message };
   }
 

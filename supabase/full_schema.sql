@@ -343,11 +343,7 @@ ON CONFLICT (user_id) DO NOTHING;
 
 CREATE OR REPLACE FUNCTION public.can_write_journal()
 RETURNS boolean LANGUAGE sql STABLE SET search_path = '' AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.subscriptions s
-    WHERE s.user_id = (SELECT auth.uid())
-      AND (s.trial_ends_at > now() OR s.paid_until > now())
-  );
+  SELECT true;
 $$;
 REVOKE ALL ON FUNCTION public.can_write_journal() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.can_write_journal() TO authenticated;

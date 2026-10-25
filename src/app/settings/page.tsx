@@ -585,7 +585,7 @@ export default function SettingsPage() {
 
               <Button
                 type="submit"
-                disabled={busy || !canWrite}
+                disabled={busy}
                 className="bg-[#00e676] hover:bg-[#00c853] text-zinc-950 font-bold text-xs h-8 px-4 cursor-pointer"
               >
                 {busy ? 'Đang thêm...' : 'Thêm'}
