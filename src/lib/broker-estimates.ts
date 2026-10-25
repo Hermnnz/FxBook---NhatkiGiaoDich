@@ -39,16 +39,39 @@ function normalizedSymbol(symbol: string): string {
   return symbol.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
+function getContractSize(symbol: string): number {
+  const sym = normalizedSymbol(symbol);
+  if (sym.includes('XAU') || sym.includes('GOLD')) {
+    return XAUUSD_CONTRACT_SIZE; // 100
+  }
+  if (sym.includes('BTC') || sym.includes('ETH')) {
+    return 1;
+  }
+  if (
+    sym.includes('US30') ||
+    sym.includes('DJ30') ||
+    sym.includes('NAS') ||
+    sym.includes('SPX') ||
+    sym.includes('GER') ||
+    sym.includes('DAX')
+  ) {
+    return 1;
+  }
+  // Standard Forex
+  return 100000;
+}
+
 /**
  * Estimates values that can be derived safely from the order fields and a
  * known broker profile. Imported MT5 trades keep the broker's actual values.
  */
 export function estimateBrokerTrade(input: BrokerTradeEstimateInput): BrokerTradeEstimate {
-  const isFtmo = /(^|\W)ftmo(\W|$)/i.test(input.accountName);
-  const isUsdAccount = input.accountCurrency.trim().toUpperCase() === 'USD';
-  const isGoldUsd = normalizedSymbol(input.symbol).startsWith('XAUUSD');
+  const accountName = (input.accountName || '').trim();
+  const isFtmo = /(^|\W)ftmo(\W|$)/i.test(accountName);
+  const accountCurrency = (input.accountCurrency || 'USD').trim().toUpperCase() || 'USD';
+  const sym = normalizedSymbol(input.symbol || '');
 
-  if (!isFtmo || !isUsdAccount || !isGoldUsd) {
+  if (!sym) {
     return {
       supported: false,
       ready: false,
@@ -56,11 +79,17 @@ export function estimateBrokerTrade(input: BrokerTradeEstimateInput): BrokerTrad
       grossProfit: null,
       fee: null,
       riskAmount: null,
-      note: 'Chưa có cấu hình tự động cho broker, tiền tệ hoặc symbol này.',
+      note: 'Vui lòng nhập Symbol để hệ thống tự tính.',
     };
   }
 
-  const profileLabel = 'FTMO · XAUUSD · USD';
+  const contractSize = getContractSize(input.symbol);
+  const isGold = sym.includes('XAU') || sym.includes('GOLD');
+
+  const profileLabel = isFtmo
+    ? `FTMO · ${sym} · ${accountCurrency}`
+    : `${accountName || 'Chuẩn'} · ${sym} · ${accountCurrency}`;
+
   if (!positive(input.entryPrice) || !positive(input.closePrice) || !positive(input.volume)) {
     return {
       supported: true,
@@ -95,18 +124,25 @@ export function estimateBrokerTrade(input: BrokerTradeEstimateInput): BrokerTrad
 
   const side = input.direction === 'buy' ? 1 : -1;
   const grossProfit = money(
-    side * (input.closePrice - input.entryPrice) * XAUUSD_CONTRACT_SIZE * input.volume,
+    side * (input.closePrice - input.entryPrice) * contractSize * input.volume,
   );
-  const commissionRate = input.tradeDate && input.tradeDate.slice(0, 10) < FTMO_COMMISSION_CHANGE_DATE
-    ? FTMO_LEGACY_METALS_COMMISSION_RATE_PER_SIDE
-    : FTMO_METALS_COMMISSION_RATE_PER_SIDE;
-  const fee = money(
-    (input.entryPrice + input.closePrice) * XAUUSD_CONTRACT_SIZE * input.volume *
-      commissionRate,
-  );
+
+  let fee = 0;
+  let feeNote = `Hệ thống tự tính Lãi/Lỗ theo kích thước hợp đồng chuẩn (${contractSize} / lot).`;
+
+  if (isFtmo && isGold) {
+    const commissionRate = input.tradeDate && input.tradeDate.slice(0, 10) < FTMO_COMMISSION_CHANGE_DATE
+      ? FTMO_LEGACY_METALS_COMMISSION_RATE_PER_SIDE
+      : FTMO_METALS_COMMISSION_RATE_PER_SIDE;
+    fee = money(
+      (input.entryPrice + input.closePrice) * contractSize * input.volume * commissionRate,
+    );
+    feeNote = `Commission được tính theo biểu phí FTMO Metals CFD (${commissionRate === FTMO_METALS_COMMISSION_RATE_PER_SIDE ? '0,0007%' : '0,0005%'} mỗi chiều); lệnh nhập tay chưa cộng swap qua đêm.`;
+  }
+
   const stopDistance = positive(input.stopLoss) && isSlValid ? Math.abs(input.entryPrice - input.stopLoss) : 0;
   const riskAmount = stopDistance > 0
-    ? money(stopDistance * XAUUSD_CONTRACT_SIZE * input.volume)
+    ? money(stopDistance * contractSize * input.volume)
     : null;
 
   return {
@@ -116,7 +152,7 @@ export function estimateBrokerTrade(input: BrokerTradeEstimateInput): BrokerTrad
     grossProfit,
     fee,
     riskAmount,
-    note: `Commission được tính theo biểu phí FTMO Metals CFD (${commissionRate === FTMO_METALS_COMMISSION_RATE_PER_SIDE ? '0,0007%' : '0,0005%'} mỗi chiều); lệnh nhập tay chưa cộng swap qua đêm.`,
+    note: feeNote,
     warning,
     isPriceInvalid,
   };

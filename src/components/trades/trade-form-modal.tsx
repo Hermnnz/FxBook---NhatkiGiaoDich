@@ -197,7 +197,7 @@ export function TradeFormModal({
   // Realtime calculated Net Profit
   const optionalNumber = (value: string) => {
     if (!value) return null;
-    const clean = String(value).replace(',', '.').trim();
+    const clean = String(value).replace(/\s+/g, '').replace(',', '.').trim();
     return clean === '' || Number.isNaN(Number(clean)) ? null : Number(clean);
   };
   const selectedAccount = accounts.find((account) => account.id === accountId);
@@ -312,16 +312,22 @@ export function TradeFormModal({
       return;
     }
     if (!preserveStoredBrokerValues && !automaticEstimate.supported) {
-      setError('Tài khoản này chưa có cấu hình tính tự động. Hiện hệ thống hỗ trợ FTMO (USD) với XAUUSD.');
+      setError('Vui lòng nhập Symbol hợp lệ để hệ thống tính toán Lãi/Lỗ.');
       setLoading(false);
       return;
     }
 
+    const numVolume = optionalNumber(volume);
+    const numEntry = optionalNumber(entryPrice);
+    const numSl = optionalNumber(slPrice);
+    const numExit = optionalNumber(exitPrice);
     const numericEntries = [volume, entryPrice, slPrice, tpPrice, exitPrice, theoreticalProfit]
       .filter((value) => value !== '');
-    if (!date || Number.isNaN(new Date(`${date}T12:00:00`).getTime()) || Number(volume) <= 0 ||
-        numericEntries.some((value) => !Number.isFinite(Number(value))) ||
-        [entryPrice, slPrice, tpPrice, exitPrice].filter((value) => value !== '').some((value) => Number(value) <= 0) ||
+    if (!date || Number.isNaN(new Date(`${date}T12:00:00`).getTime()) || numVolume === null || numVolume <= 0 ||
+        numericEntries.some((value) => optionalNumber(value) === null) ||
+        numEntry === null || numEntry <= 0 ||
+        numSl === null || numSl <= 0 ||
+        numExit === null || numExit <= 0 ||
         effectiveProfit === null || effectiveFee === null) {
       setError('Kiểm tra ngày, Entry, Stop Loss, Close Price và Volume để hệ thống tự tính lãi/lỗ và phí.');
       setLoading(false);

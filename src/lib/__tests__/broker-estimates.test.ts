@@ -48,13 +48,19 @@ describe('estimateBrokerTrade', () => {
     expect(result.fee).toBe(0.31);
   });
 
-  it('waits for order fields and rejects unknown broker profiles', () => {
+  it('waits for order fields and supports non-FTMO custom accounts', () => {
     const incomplete = estimateBrokerTrade({ ...ftmoGold, closePrice: null });
-    const unknown = estimateBrokerTrade({ ...ftmoGold, accountName: 'Personal' });
+    const custom = estimateBrokerTrade({ ...ftmoGold, accountName: 'Demo-2026' });
+    const emptySym = estimateBrokerTrade({ ...ftmoGold, symbol: '' });
 
     expect(incomplete.supported).toBe(true);
     expect(incomplete.ready).toBe(false);
     expect(incomplete.fee).toBeNull();
-    expect(unknown.supported).toBe(false);
+
+    expect(custom.supported).toBe(true);
+    expect(custom.ready).toBe(true);
+    expect(custom.grossProfit).toBe(66.92);
+
+    expect(emptySym.supported).toBe(false);
   });
 });
