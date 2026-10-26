@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import type { Trade, Account } from '@/types';
-import { netProfit, calcRMultiple } from '@/lib/calculations';
+import { netProfit, calcRMultiple, sortTradesDescending } from '@/lib/calculations';
 import { formatMoney } from '@/components/dashboard/format-money';
 import { serializeTradesCsv } from '@/lib/parsers/csv';
 import { deleteTrade } from '@/lib/actions/trades';
@@ -237,9 +237,9 @@ export function TradeHistoryTable({
     { label: 'Hòa vốn (BE)', value: 'breakeven' },
   ];
 
-  // Filtering
+  // Filtering & Sorting (newest trades on top)
   const filteredTrades = useMemo(() => {
-    return trades.filter((trade) => {
+    const filtered = trades.filter((trade) => {
       // 1. Account
       if (selectedAccountId && selectedAccountId !== 'all' && trade.account_id !== selectedAccountId) {
         return false;
@@ -281,6 +281,8 @@ export function TradeHistoryTable({
 
       return true;
     });
+
+    return sortTradesDescending(filtered);
   }, [trades, selectedAccountId, selectedMonth, selectedSymbol, outcomeFilter, searchQuery, accountMap]);
 
   // Pagination

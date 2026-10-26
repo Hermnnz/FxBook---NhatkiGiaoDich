@@ -11,7 +11,7 @@ import {
   Cell,
   Tooltip,
 } from 'recharts';
-import { calcRMultiple, netProfit, sortTradesByTime } from '@/lib/calculations';
+import { calcRMultiple, netProfit, sortTradesByTime, sortTradesDescending } from '@/lib/calculations';
 import { localDateKey } from '@/lib/phase5/readiness';
 import { formatMoney } from '@/components/dashboard/format-money';
 import type { Account, Trade } from '@/types';
@@ -105,9 +105,9 @@ export function PnLHeatmapCalendar({ trades, account, currency = 'USD', displayM
     return { totalPnl, tradingDays };
   }, [calendarWeeks]);
 
-  // Recent 5 trades
+  // Recent 5 trades (newest trades on top)
   const recentTrades = useMemo(() => {
-    return sortTradesByTime(trades).slice(-5).reverse();
+    return sortTradesDescending(trades).slice(0, 5);
   }, [trades]);
 
   // Day of week profit & loss data (Mon to Sun)

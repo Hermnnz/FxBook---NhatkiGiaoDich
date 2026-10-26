@@ -20,6 +20,7 @@ import {
   calcTradeQuadMatrix,
   calcPerformanceScore,
   sortTradesByTime,
+  sortTradesDescending,
 } from '../calculations';
 import type { Trade, Account, AccountTransaction } from '@/types';
 
@@ -188,6 +189,49 @@ describe('sortTradesByTime', () => {
     expect(chronological.map((trade) => trade.id)).toEqual(['first', 'second', 'third']);
     expect(calcStats(chronological).maxWinStreak).toBe(1);
     expect(calcMaxDrawdown(chronological, 1000).maxDrawdownUsd).toBe(150);
+  });
+
+  it('tie-breaks identical time using created_at chronologically', () => {
+    const trades = [
+      makeTrade({ id: 'late', profit: 50, fee: 0, date: '2024-01-01T12:00:00Z', close_time: '2024-01-01T12:00:00Z', created_at: '2024-01-01T15:00:00Z' }),
+      makeTrade({ id: 'early', profit: 20, fee: 0, date: '2024-01-01T12:00:00Z', close_time: '2024-01-01T12:00:00Z', created_at: '2024-01-01T10:00:00Z' }),
+    ];
+    const sorted = sortTradesByTime(trades);
+    expect(sorted.map((t) => t.id)).toEqual(['early', 'late']);
+  });
+});
+
+describe('sortTradesDescending', () => {
+  it('places the most recent trade at the top', () => {
+    const trades = [
+      makeTrade({ id: 'old', profit: 10, fee: 0, close_time: '2024-01-01T00:00:00Z' }),
+      makeTrade({ id: 'newest', profit: 30, fee: 0, close_time: '2024-01-03T00:00:00Z' }),
+      makeTrade({ id: 'mid', profit: 20, fee: 0, close_time: '2024-01-02T00:00:00Z' }),
+    ];
+
+    const sorted = sortTradesDescending(trades);
+    expect(sorted.map((t) => t.id)).toEqual(['newest', 'mid', 'old']);
+  });
+
+  it('tie-breaks identical date/time by placing newest created_at at the top', () => {
+    const trades = [
+      makeTrade({ id: 'first_created', profit: 10, fee: 0, date: '2026-10-26T12:00:00Z', close_time: '2026-10-26T12:00:00Z', created_at: '2026-10-26T06:00:00Z' }),
+      makeTrade({ id: 'second_created', profit: 20, fee: 0, date: '2026-10-26T12:00:00Z', close_time: '2026-10-26T12:00:00Z', created_at: '2026-10-26T07:30:00Z' }),
+    ];
+
+    const sorted = sortTradesDescending(trades);
+    expect(sorted.map((t) => t.id)).toEqual(['second_created', 'first_created']);
+  });
+
+  it('does not mutate original array', () => {
+    const trades = [
+      makeTrade({ id: '1', profit: 10, fee: 0, close_time: '2024-01-01T00:00:00Z' }),
+      makeTrade({ id: '2', profit: 20, fee: 0, close_time: '2024-01-02T00:00:00Z' }),
+    ];
+
+    const sorted = sortTradesDescending(trades);
+    expect(sorted).not.toBe(trades);
+    expect(trades[0].id).toBe('1');
   });
 });
 

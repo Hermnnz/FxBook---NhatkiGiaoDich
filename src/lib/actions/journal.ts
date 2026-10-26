@@ -24,7 +24,10 @@ export async function getJournalBundle(): Promise<JournalBundle> {
     const rows = [];
     for (let from = 0; ; from += 1000) {
       const page = await supabase.from('trades').select('*')
-        .order('date', { ascending: false }).order('id', { ascending: false }).range(from, from + 999);
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, from + 999);
       if (page.error) throw new Error(`Không tải được lệnh: ${page.error.message}`);
       rows.push(...(page.data ?? []));
       if ((page.data?.length ?? 0) < 1000) return rows;

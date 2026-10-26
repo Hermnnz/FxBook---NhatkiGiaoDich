@@ -68,7 +68,9 @@ export async function getTrades(filters?: TradeFilterParams): Promise<Trade[]> {
     const data = [];
     for (let from = 0; ; from += 1000) {
       let query = supabase.from('trades').select('*')
-        .order('date', { ascending: false }).order('id', { ascending: false });
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false });
       if (filters?.accountId) query = query.eq('account_id', filters.accountId);
       if (filters?.symbol) query = query.ilike('symbol', `%${filters.symbol}%`);
       if (filters?.startDate) query = query.gte('date', filters.startDate);

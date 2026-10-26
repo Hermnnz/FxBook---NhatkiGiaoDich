@@ -71,8 +71,8 @@ export function calcCurrentBalance(
 // ============================================================
 
 /**
- * Sort trades by close time (or open date as fallback), then by id.
- * Matches the reference implementation's compareTradeTime logic.
+ * Sort trades by close time (or open date as fallback), then by created_at, then by id.
+ * Matches the reference implementation's compareTradeTime logic for chronological calculations.
  */
 export function sortTradesByTime(trades: Trade[]): Trade[] {
   return [...trades].sort((a, b) => {
@@ -80,8 +80,40 @@ export function sortTradesByTime(trades: Trade[]): Trade[] {
     const timeB = b.close_time || b.date;
     if (timeA < timeB) return -1;
     if (timeA > timeB) return 1;
-    // Tie-break by id for deterministic ordering
+
+    // Tie-break by created_at chronologically (older created first)
+    const createdA = a.created_at || '';
+    const createdB = b.created_at || '';
+    if (createdA < createdB) return -1;
+    if (createdA > createdB) return 1;
+
+    // Secondary tie-break by id for deterministic ordering
     return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
+}
+
+/**
+ * Sort trades descending (newest trades first) for display in history tables and recent trade lists.
+ * Primary: close_time or date descending (newest date/time first).
+ * Secondary: open date descending.
+ * Tertiary: created_at descending (tie-breaker for same-day manual entries: latest created first).
+ * Quaternary: id descending (stable tie-breaker).
+ */
+export function sortTradesDescending(trades: Trade[]): Trade[] {
+  return [...trades].sort((a, b) => {
+    const timeA = new Date(a.close_time || a.date).getTime();
+    const timeB = new Date(b.close_time || b.date).getTime();
+    if (timeB !== timeA) return timeB - timeA;
+
+    const dateA = new Date(a.date).getTime();
+    const dateB = new Date(b.date).getTime();
+    if (dateB !== dateA) return dateB - dateA;
+
+    const createdA = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const createdB = b.created_at ? new Date(b.created_at).getTime() : 0;
+    if (createdB !== createdA) return createdB - createdA;
+
+    return (b.id || '').localeCompare(a.id || '');
   });
 }
 

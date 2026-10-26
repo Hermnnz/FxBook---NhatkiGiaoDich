@@ -339,8 +339,13 @@ export function TradeFormModal({
       return;
     }
 
+    const isToday = date === getTodayString();
     const editedSameDate = !!trade && trade.date.slice(0, 10) === date;
-    const tradeDate = editedSameDate ? trade.date : new Date(`${date}T12:00:00`).toISOString();
+    const tradeDate = editedSameDate
+      ? trade.date
+      : isToday
+        ? new Date().toISOString()
+        : new Date(`${date}T12:00:00`).toISOString();
     const tradeCloseTime = editedSameDate ? trade.close_time : tradeDate;
 
     const tradePayload = {
