@@ -6,6 +6,7 @@ import { netProfit, calcRMultiple, sortTradesDescending } from '@/lib/calculatio
 import { formatMoney } from '@/components/dashboard/format-money';
 import { serializeTradesCsv } from '@/lib/parsers/csv';
 import { deleteTrade } from '@/lib/actions/trades';
+import { useJournalData } from '@/contexts/journal-context';
 import { useJournalWritable } from '@/lib/phase5/use-journal-writable';
 import { Button } from '@/components/ui/button';
 import {
@@ -147,9 +148,9 @@ export function TradeHistoryTable({
   selectedAccountId,
   onAccountChange,
   onEditTrade,
-  onRefresh,
   onOpenImport,
 }: TradeHistoryTableProps) {
+  const { addTradeLocally, deleteTradeLocally } = useJournalData();
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [selectedSymbol, setSelectedSymbol] = useState<string>('all');
   const [outcomeFilter, setOutcomeFilter] = useState<'all' | 'win' | 'loss' | 'breakeven'>('all');
@@ -299,14 +300,17 @@ export function TradeHistoryTable({
     if (!confirm('Bạn có chắc chắn muốn xóa lệnh này khỏi nhật ký?')) return;
     setDeleteError('');
     setDeleting(true);
+    const deletedTrade = trades.find((trade) => trade.id === id);
+    deleteTradeLocally(id);
     try {
       const result = await deleteTrade(id);
       if (!result.success) {
+        if (deletedTrade) addTradeLocally(deletedTrade);
         setDeleteError(result.error ?? 'Không xóa được lệnh.');
         return;
       }
-      onRefresh();
     } catch (error) {
+      if (deletedTrade) addTradeLocally(deletedTrade);
       setDeleteError(error instanceof Error ? error.message : 'Không xóa được lệnh.');
     } finally {
       setDeleting(false);

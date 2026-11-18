@@ -134,14 +134,16 @@ export async function getTrades(filters?: TradeFilterParams): Promise<Trade[]> {
 
 let hasReviewColumnCached: boolean | null = null;
 
-export async function createTrade(tradeData: TradeInsert): Promise<{ success: boolean; data?: Trade; error?: string }> {
+export async function createTrade(tradeData: TradeInsert, clientId?: string): Promise<{ success: boolean; data?: Trade; error?: string }> {
   const parsed = tradeSchema.safeParse(tradeData);
-  if (!parsed.success || !validTradeTime(tradeData.date, tradeData.close_time)) {
+  if (!parsed.success || (clientId !== undefined && !z.uuid().safeParse(clientId).success) ||
+      !validTradeTime(tradeData.date, tradeData.close_time)) {
     return { success: false, error: 'Thông tin lệnh không hợp lệ.' };
   }
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { success: false, error: 'Chưa đăng nhập.' };
+  const { data: auth } = await supabase.auth.getClaims();
+  const userId = auth?.claims?.sub;
+  if (!userId) return { success: false, error: 'Chưa đăng nhập.' };
 
   const profitInput = {
     mode: parsed.data.profit_calc_mode, direction: parsed.data.direction,
@@ -180,7 +182,8 @@ export async function createTrade(tradeData: TradeInsert): Promise<{ success: bo
   const { data, error } = await supabase
     .from('trades')
     .insert({
-      user_id: user.id,
+      ...(clientId ? { id: clientId } : {}),
+      user_id: userId,
       ...baseFields,
       ...(calculationModeEnabled ? calculationFields : {}),
       symbol: parsed.data.symbol.toUpperCase(),

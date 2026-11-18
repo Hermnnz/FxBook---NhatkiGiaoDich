@@ -11,7 +11,6 @@ import React, {
 } from 'react';
 import { getJournalBundle } from '@/lib/actions/journal';
 import { getStoredActiveAccountId, setStoredActiveAccountId } from '@/lib/active-account';
-import { calcCurrentBalance } from '@/lib/calculations';
 import type { Account, Trade, AccountTransaction } from '@/types';
 
 interface JournalContextType {
@@ -94,10 +93,20 @@ export function JournalProvider({ children }: { children: React.ReactNode }) {
   // Synchronously compute balances for all accounts in 0ms (no server roundtrips)
   const balances = useMemo(() => {
     const map: Record<string, number> = {};
+    const transactionTotals = new Map<string, number>();
+    const tradeTotals = new Map<string, number>();
+
+    for (const tx of transactions) {
+      const signedAmount = tx.type === 'deposit' ? tx.amount : -tx.amount;
+      transactionTotals.set(tx.account_id, (transactionTotals.get(tx.account_id) ?? 0) + signedAmount);
+    }
+    for (const trade of trades) {
+      tradeTotals.set(trade.account_id, (tradeTotals.get(trade.account_id) ?? 0) + trade.profit - trade.fee);
+    }
     for (const acc of accounts) {
-      const accTxs = transactions.filter((tx) => tx.account_id === acc.id);
-      const accTrades = trades.filter((t) => t.account_id === acc.id);
-      map[acc.id] = calcCurrentBalance(acc.initial_balance, accTxs, accTrades);
+      map[acc.id] = acc.initial_balance
+        + (transactionTotals.get(acc.id) ?? 0)
+        + (tradeTotals.get(acc.id) ?? 0);
     }
     return map;
   }, [accounts, transactions, trades]);
@@ -191,6 +200,20 @@ export function JournalProvider({ children }: { children: React.ReactNode }) {
       isMountedRef.current = false;
     };
   }, [refreshData, cached]);
+
+  // Keep the latest visible state locally, including optimistic mutations. On
+  // the next visit the UI can paint immediately while Supabase syncs silently.
+  useEffect(() => {
+    if (loading && accounts.length === 0) return;
+    writeCache({
+      accounts,
+      trades,
+      transactions,
+      userEmail,
+      selectedAccountId,
+      timestamp: Date.now(),
+    });
+  }, [accounts, trades, transactions, userEmail, selectedAccountId, loading]);
 
   // Local mutations update only the current authenticated provider instance.
   const addTradeLocally = useCallback((trade: Trade) => {

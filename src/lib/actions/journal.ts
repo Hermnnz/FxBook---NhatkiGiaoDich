@@ -35,7 +35,7 @@ export async function getJournalBundle(): Promise<JournalBundle> {
   }
 
   const [authRes, accountsRes, tradeRows, txsRes] = await Promise.all([
-    supabase.auth.getUser(),
+    supabase.auth.getClaims(),
     supabase.from('accounts').select('*').order('created_at', { ascending: true }),
     loadAllTrades(),
     supabase.from('account_transactions').select('*').order('date', { ascending: false }).order('id', { ascending: false }),
@@ -45,8 +45,9 @@ export async function getJournalBundle(): Promise<JournalBundle> {
   if (accountsRes.error) throw new Error(`Không tải được tài khoản giao dịch: ${accountsRes.error.message}`);
   if (txsRes.error) throw new Error(`Không tải được nạp/rút: ${txsRes.error.message}`);
 
-  const user = authRes.data?.user
-    ? { id: authRes.data.user.id, email: authRes.data.user.email }
+  const claims = authRes.data?.claims;
+  const user = claims?.sub
+    ? { id: claims.sub, email: typeof claims.email === 'string' ? claims.email : undefined }
     : null;
 
   const accounts: Account[] = (accountsRes.data || []).map((row) => ({

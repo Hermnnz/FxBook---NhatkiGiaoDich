@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Menu,
   X,
@@ -58,7 +58,9 @@ const NAV_GROUPS: NavGroup[] = [
 
 export function Sidebar({ userEmail }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [optimisticPath, setOptimisticPath] = useState(pathname);
   const { accounts, trades, selectedAccountId, userEmail: contextEmail } = useJournalData();
 
   const tradeCount = trades.length;
@@ -70,9 +72,25 @@ export function Sidebar({ userEmail }: SidebarProps) {
     : 'Tất cả tài khoản';
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setMobileOpen(false), 0);
+    const timer = window.setTimeout(() => {
+      setOptimisticPath(pathname);
+      setMobileOpen(false);
+    }, 0);
     return () => window.clearTimeout(timer);
   }, [pathname]);
+
+  // Warm every internal screen after the current page is interactive. A click
+  // therefore reuses the prefetched route instead of waiting for its first load.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      for (const group of NAV_GROUPS) {
+        for (const item of group.items) {
+          if (!item.isExternalOrModal) router.prefetch(item.href);
+        }
+      }
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [router]);
 
   return (
     <>
@@ -155,8 +173,8 @@ export function Sidebar({ userEmail }: SidebarProps) {
                 {group.items.map((item) => {
                   const isActive =
                     item.href === '/'
-                      ? pathname === '/'
-                      : !item.isExternalOrModal && pathname.startsWith(item.href);
+                      ? optimisticPath === '/'
+                      : !item.isExternalOrModal && optimisticPath.startsWith(item.href);
 
                   if (item.isExternalOrModal) {
                     return (
@@ -180,7 +198,10 @@ export function Sidebar({ userEmail }: SidebarProps) {
                     <Link
                       key={item.href}
                       href={item.href}
-                      prefetch={true}
+                      prefetch={false}
+                      onPointerEnter={() => router.prefetch(item.href)}
+                      onFocus={() => router.prefetch(item.href)}
+                      onClick={() => setOptimisticPath(item.href)}
                       className={`flex items-center gap-2.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                         isActive
                           ? 'bg-[#1b2e25] text-[#00e676] font-semibold shadow-xs border-l-2 border-[#00e676]'
@@ -207,7 +228,10 @@ export function Sidebar({ userEmail }: SidebarProps) {
           {/* Quick Account Box */}
           <Link
             href="/settings"
-            prefetch={true}
+            prefetch={false}
+            onPointerEnter={() => router.prefetch('/settings')}
+            onFocus={() => router.prefetch('/settings')}
+            onClick={() => setOptimisticPath('/settings')}
             className="block p-2.5 rounded-lg bg-[#202225] border border-[#2d3034] hover:border-[#00e676]/40 transition-colors cursor-pointer"
           >
             <div className="text-xs font-bold text-white truncate">

@@ -33,15 +33,17 @@ export function FloatingActionButton({
         <Plus className="h-6 w-6 stroke-[2.8]" />
       </button>
 
-      <TradeFormModal
-        open={open}
-        onOpenChange={setOpen}
-        accounts={accounts}
-        activeAccountId={activeAccountId}
-        onSuccess={() => {
-          onTradeAdded?.();
-        }}
-      />
+      {open && (
+        <TradeFormModal
+          open={open}
+          onOpenChange={setOpen}
+          accounts={accounts}
+          activeAccountId={activeAccountId}
+          onSuccess={() => {
+            onTradeAdded?.();
+          }}
+        />
+      )}
     </>
   );
 }

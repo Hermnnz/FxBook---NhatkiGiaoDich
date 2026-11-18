@@ -98,7 +98,7 @@ export function TradeFormModal({
 }: TradeFormModalProps) {
   const isEditing = !!trade;
   const writable = useJournalWritable();
-  const { addTradeLocally, updateTradeLocally, refreshData } = useJournalData();
+  const { addTradeLocally, updateTradeLocally, deleteTradeLocally } = useJournalData();
 
   // Basic Form States (Always visible - matching images/them.png)
   const [accountId, setAccountId] = useState<string>('');
@@ -276,7 +276,6 @@ export function TradeFormModal({
 
   async function saveTradeData(keepOpen: boolean) {
     setError(null);
-    setLoading(true);
 
     if (!accountId) {
       setError('Vui lòng tạo và chọn tài khoản giao dịch trước khi lưu lệnh.');
@@ -389,22 +388,51 @@ export function TradeFormModal({
       eval_errors_reviewed: noErrorSelected || evalErrors.length > 0,
     };
 
+    const now = new Date().toISOString();
+    const optimisticId = trade?.id ?? crypto.randomUUID();
+    const optimisticTrade: Trade = trade
+      ? { ...trade, ...tradePayload, updated_at: now }
+      : {
+          ...tradePayload,
+          id: optimisticId,
+          user_id: accounts.find((account) => account.id === accountId)?.user_id ?? '',
+          created_at: now,
+          updated_at: now,
+        };
+
+    // Paint the result first; the server write continues in the background.
+    if (isEditing) updateTradeLocally(optimisticTrade);
+    else addTradeLocally(optimisticTrade);
+
+    if (keepOpen) {
+      setEntryPrice('');
+      setSlPrice('');
+      setTpPrice('');
+      setExitPrice('');
+      setTheoreticalProfit('');
+      setTradingviewUrl('');
+      setNote('');
+      setEvalBefore([]);
+      setEvalDuring([]);
+      setEvalAfter([]);
+      setEvalErrors([]);
+      setNoErrorSelected(false);
+    } else {
+      onOpenChange(false);
+    }
+
     try {
       let savedTrade: Trade | null = null;
       if (isEditing && trade) {
         const res = await updateTrade(trade.id, tradePayload);
         if (!res.success) {
-          setError(res.error || 'Cập nhật lệnh thất bại.');
-          setLoading(false);
-          return;
+          throw new Error(res.error || 'Cập nhật lệnh thất bại.');
         }
         savedTrade = res.data ?? null;
       } else {
-        const res = await createTrade(tradePayload);
+        const res = await createTrade(tradePayload, optimisticId);
         if (!res.success) {
-          setError(res.error || 'Thêm lệnh thất bại.');
-          setLoading(false);
-          return;
+          throw new Error(res.error || 'Thêm lệnh thất bại.');
         }
         savedTrade = res.data ?? null;
       }
@@ -414,36 +442,19 @@ export function TradeFormModal({
         if (isEditing) {
           updateTradeLocally(savedTrade);
         } else {
-          addTradeLocally(savedTrade);
+          updateTradeLocally(savedTrade);
         }
       }
-
-      if (keepOpen) {
-        // Reset inputs de nhap lenh tiep theo
-        setEntryPrice('');
-        setSlPrice('');
-        setTpPrice('');
-        setExitPrice('');
-        setTheoreticalProfit('');
-        setTradingviewUrl('');
-        setNote('');
-        setEvalBefore([]);
-        setEvalDuring([]);
-        setEvalAfter([]);
-        setEvalErrors([]);
-        setNoErrorSelected(false);
-        setLoading(false);
-      } else {
-        onOpenChange(false);
-        setLoading(false);
-      }
-
-      // Background silent revalidation without freezing UI
-      void refreshData({ silent: true });
       onSuccess?.();
-    } catch {
-      setError('Đã xảy ra lỗi khi lưu lệnh.');
-      setLoading(false);
+    } catch (saveError) {
+      if (trade) updateTradeLocally(trade);
+      else deleteTradeLocally(optimisticId);
+      const message = saveError instanceof Error ? saveError.message : 'Đã xảy ra lỗi khi lưu lệnh.';
+      setError(message);
+      if (!keepOpen) {
+        onOpenChange(true);
+        window.alert(`Không lưu được lệnh: ${message}`);
+      }
     }
   }
 

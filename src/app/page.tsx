@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { useJournalData } from '@/contexts/journal-context';
 import {
   calcStats,
@@ -18,16 +19,33 @@ import { Sidebar } from '@/components/layout/sidebar';
 import { PageFooterBanner } from '@/components/layout/page-footer-banner';
 import { TradeFormModal } from '@/components/trades/trade-form-modal';
 import { MarketSessionsClock } from '@/components/dashboard/market-sessions-clock';
-import { PerformanceRadar } from '@/components/dashboard/performance-radar';
-import { EquityCharts } from '@/components/dashboard/equity-charts';
-import { PnLHeatmapCalendar } from '@/components/dashboard/pnl-heatmap-calendar';
-import { TradeBreakdown } from '@/components/dashboard/trade-breakdown';
-import { PsychologyScorecard } from '@/components/dashboard/psychology-scorecard';
+import { DeferredDashboardSection } from '@/components/dashboard/deferred-dashboard-section';
 import { FloatingActionButton } from '@/components/trades/floating-action-button';
 import { formatMoney } from '@/components/dashboard/format-money';
 import { useTodayReadiness } from '@/components/dashboard/readiness-badge';
 import { Button } from '@/components/ui/button';
 import { ChevronRight, Loader2 } from 'lucide-react';
+
+const PerformanceRadar = dynamic(
+  () => import('@/components/dashboard/performance-radar').then((module) => module.PerformanceRadar),
+  { ssr: false },
+);
+const EquityCharts = dynamic(
+  () => import('@/components/dashboard/equity-charts').then((module) => module.EquityCharts),
+  { ssr: false },
+);
+const PnLHeatmapCalendar = dynamic(
+  () => import('@/components/dashboard/pnl-heatmap-calendar').then((module) => module.PnLHeatmapCalendar),
+  { ssr: false },
+);
+const TradeBreakdown = dynamic(
+  () => import('@/components/dashboard/trade-breakdown').then((module) => module.TradeBreakdown),
+  { ssr: false },
+);
+const PsychologyScorecard = dynamic(
+  () => import('@/components/dashboard/psychology-scorecard').then((module) => module.PsychologyScorecard),
+  { ssr: false },
+);
 
 function weekOfMonth(dateKey: string): number {
   const [year, month, day] = dateKey.split('-').map(Number);
@@ -352,7 +370,8 @@ export default function DashboardPage() {
               </div>
 
               {/* 3. Section: THỐNG KÊ & HIỆU SUẤT */}
-              <div className="space-y-3 pt-4">
+              <DeferredDashboardSection minHeight={560}>
+                <div className="space-y-3 pt-4">
                 <h2 className="text-sm font-bold text-[#00e676] uppercase tracking-wider">
                   THỐNG KÊ & HIỆU SUẤT
                 </h2>
@@ -482,28 +501,35 @@ export default function DashboardPage() {
                     <EquityCharts trades={accountTrades} account={activeAccount} />
                   </div>
                 </div>
-              </div>
+                </div>
+              </DeferredDashboardSection>
 
               {/* 4. Section: Heatmap P&L Calendar & Recent Trades */}
-              <div className="pt-4">
-                <PnLHeatmapCalendar trades={accountTrades} account={activeAccount} currency={currency} displayMonth={selectedMonth} />
-              </div>
+              <DeferredDashboardSection minHeight={430}>
+                <div className="pt-4">
+                  <PnLHeatmapCalendar trades={accountTrades} account={activeAccount} currency={currency} displayMonth={selectedMonth} />
+                </div>
+              </DeferredDashboardSection>
 
               {/* 5. Section: CHẤT LƯỢNG GIAO DỊCH */}
-              <div className="space-y-3 pt-4">
-                <h2 className="text-sm font-bold text-[#00e676] uppercase tracking-wider">
-                  CHẤT LƯỢNG GIAO DỊCH
-                </h2>
-                <TradeBreakdown trades={accountTrades} currency={currency} />
-              </div>
+              <DeferredDashboardSection minHeight={500}>
+                <div className="space-y-3 pt-4">
+                  <h2 className="text-sm font-bold text-[#00e676] uppercase tracking-wider">
+                    CHẤT LƯỢNG GIAO DỊCH
+                  </h2>
+                  <TradeBreakdown trades={accountTrades} currency={currency} />
+                </div>
+              </DeferredDashboardSection>
 
               {/* 6. Section: THANG ĐIỂM THỰC THI LỆNH */}
-              <div className="space-y-3 pt-4">
-                <h2 className="text-sm font-bold text-[#00e676] uppercase tracking-wider">
-                  THANG ĐIỂM THỰC THI LỆNH
-                </h2>
-                <PsychologyScorecard trades={accountTrades} currency={currency} />
-              </div>
+              <DeferredDashboardSection minHeight={420}>
+                <div className="space-y-3 pt-4">
+                  <h2 className="text-sm font-bold text-[#00e676] uppercase tracking-wider">
+                    THANG ĐIỂM THỰC THI LỆNH
+                  </h2>
+                  <PsychologyScorecard trades={accountTrades} currency={currency} />
+                </div>
+              </DeferredDashboardSection>
             </>
           )}
 
@@ -520,14 +546,16 @@ export default function DashboardPage() {
       />
 
       {/* Trade Form Modal */}
-      <TradeFormModal
-        open={formModalOpen}
-        onOpenChange={setFormModalOpen}
-        trade={editingTrade}
-        accounts={accounts}
-        activeAccountId={selectedAccountId}
-        onSuccess={refreshData}
-      />
+      {formModalOpen && (
+        <TradeFormModal
+          open={formModalOpen}
+          onOpenChange={setFormModalOpen}
+          trade={editingTrade}
+          accounts={accounts}
+          activeAccountId={selectedAccountId}
+          onSuccess={refreshData}
+        />
+      )}
     </div>
   );
 }
